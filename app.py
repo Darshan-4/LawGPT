@@ -1,45 +1,33 @@
-import os
+import streamlit as st
 import requests
-from flask import Flask, request, jsonify
 
-app = Flask(__name__)
+# Streamlit UI
+st.title("🧠 LawGPT - Legal Question Answering")
 
-# Load NVIDIA API key from environment variable
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
-NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-MODEL_NAME = "nvidia/llama3-chatqa-1.5-70b"
+api_key = st.text_input("🔑 Enter your NVIDIA API Key", type="password")
+question = st.text_area("📜 Enter your legal question")
 
-@app.route('/ask', methods=['POST'])
-def ask_question():
-    if not NVIDIA_API_KEY:
-        return jsonify({"error": "NVIDIA API key not set in environment"}), 500
+if st.button("Ask"):
+    if not api_key:
+        st.error("Please enter your NVIDIA API key.")
+    elif not question.strip():
+        st.error("Please enter a legal question.")
+    else:
+        payload = {
+            "model": "nvidia/llama3-chatqa-1.5-70b",
+            "messages": [{"role": "user", "content": question}]
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
 
-    data = request.get_json()
-    if not data or 'question' not in data:
-        return jsonify({"error": "Missing 'question' in request body"}), 400
-
-    question = data['question']
-
-    payload = {
-        "model": MODEL_NAME,
-        "messages": [
-            {"role": "user", "content": question}
-        ]
-    }
-
-    headers = {
-        "Authorization": f"Bearer {NVIDIA_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(NVIDIA_API_URL, json=payload, headers=headers)
-        response.raise_for_status()
-        result = response.json()
-        answer = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return jsonify({"answer": answer})
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True)
+        try:
+            response = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", json=payload, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+            answer = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            st.success("✅ Response:")
+            st.write(answer)
+        except requests.exceptions.RequestException as e:
+            st.error(f"❌ Error: {str(e)}")
